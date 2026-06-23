@@ -2,39 +2,67 @@ import { useState, useEffect } from 'react';
 import './App.css';
 
 function App() {
-  // 새로고침해도 데이터가 유지되도록 로컬 스토리지 연동
-  const [toDos, setToDos] = useState(() => {
-    const saved = localStorage.getItem("toDos");
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [toDos, setToDos] = useState([]);
   const [toDo, setToDo] = useState("");
 
-  // toDos 배열이 바뀔 때마다 브라우저에 자동 저장
+  // 1. [서버에서 데이터 가져오기] 앱이 켜질 때 백엔드에 GET 요청
+  const fetchTodos = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/todos');
+      const data = await response.json();
+      setToDos(data);
+    } catch (error) {
+      console.error("데이터 로딩 실패:", error);
+    }
+  };
+
   useEffect(() => {
-    localStorage.setItem("toDos", JSON.stringify(toDos));
-  }, [toDos]);
+    fetchTodos();
+  }, []);
 
   const onChange = (e) => setToDo(e.target.value);
 
-  const onSubmit = (e) => {
+  // 2. [서버에 데이터 추가하기] 버튼 누를 때 백엔드에 POST 요청
+  const onSubmit = async (e) => {
     e.preventDefault();
     if (toDo.trim() === "") return;
-    // 고유 ID와 완료 여부(done) 속성 추가
-    setToDos([{ id: Date.now(), text: toDo, done: false }, ...toDos]);
-    setToDo("");
+
+    try {
+      await fetch('http://localhost:5000/api/todos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: toDo })
+      });
+      setToDo("");
+      fetchTodos(); // 등록 후 목록 새로고침
+    } catch (error) {
+      console.error("추가 실패:", error);
+    }
   };
 
-  const deleteBtn = (id) => {
-    setToDos(toDos.filter(item => item.id !== id));
+  // 3. [서버에서 데이터 삭제하기] ❌ 누를 때 백엔드에 DELETE 요청
+  const deleteBtn = async (id) => {
+    try {
+      await fetch(`http://localhost:5000/api/todos/${id}`, { method: 'DELETE' });
+      fetchTodos(); // 삭제 후 목록 새로고침
+    } catch (error) {
+      console.error("삭제 실패:", error);
+    }
   };
 
-  const toggleDone = (id) => {
-    setToDos(toDos.map(item => item.id === id ? { ...item, done: !item.done } : item));
+  // 4. [서버 상태 토글] 글씨 누를 때 백엔드에 PATCH 요청
+  const toggleDone = async (id) => {
+    try {
+      await fetch(`http://localhost:5000/api/todos/${id}`, { method: 'PATCH' });
+      fetchTodos(); // 토글 후 목록 새로고침
+    } catch (error) {
+      console.error("토글 실패:", error);
+    }
   };
 
   return (
     <div className="container">
-      <h1>🚀 나의 To-Do 앱</h1>
+      <h1>🚀 연동형 To-Do 앱</h1>
       <form onSubmit={onSubmit}>
         <input 
           onChange={onChange} 
